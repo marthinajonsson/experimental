@@ -88,7 +88,7 @@ void getUnpackData(std::string& file) {
 }
 
 #include "FileStructure.h"
-std::vector<std::string> parse(std::string &&decompressedFilename, std::string &&findStr)
+std::vector<std::string> parse(std::string &&decompressedFilename, std::string &&findStr, const short &column)
 {
     std::fstream file;
     std::string compressedFilename = decompressedFilename + ".gz";
@@ -105,12 +105,21 @@ std::vector<std::string> parse(std::string &&decompressedFilename, std::string &
     std::string header;
     getline(file, header);
 
-    std::stringstream s(header);
-
-    while (getline(s, word, '\t')) {
+    if(column < 99) {
+        //std::string firstWord = header.substr(0, line.find('\t'));
+        std::stringstream s(header);
+        for(int i = 0; i <= column; i++) {
+            getline(s, word, '\t');
+        }
         row.emplace_back(word);
+    }else {
+        std::stringstream s(header);
+        while (getline(s, word, '\t')) {
+            row.emplace_back(word);
+        }
+
     }
-    row.emplace_back("HEADERSTOP");
+
     while (!file.eof()) {
 
         getline(file, line);
@@ -122,57 +131,48 @@ std::vector<std::string> parse(std::string &&decompressedFilename, std::string &
 
         std::stringstream s(line);
 
-        while (getline(s, word, '\t')) {
+        if(column < 99) {
+//            std::string firstWord = line.substr(0, line.find('\t'));
+//            row.emplace_back(firstWord);
+            for(int i = 0; i <= column; i++) {
+                getline(s, word, '\t');
+            }
+            if(column == 2 && word.compare(findStr) != 0) { //title
+                continue;
+            }
             row.emplace_back(word);
+        }else {
+            while (getline(s, word, '\t')) {
+                row.emplace_back(word);
+            }
         }
+
     }
     file.close();
 
     return row;
 }
 
+/*
+ * TODO: parse lines matching title
+ * TODO: add separate method that takes does line and split columns based on param such (titleId) to cut down on the work for each operation.
+ *
+ * */
 
 double Task ()
 {
     FileStructure filestructure;
     std::cout << "Async thread running" << std::endl;
-    std::vector<std::string> result = parse("title.akas.tsv", "The Proposal");
+    std::vector<std::string> resultIdn = parse("title.akas.tsv", "The Proposal", filestructure.akas.titleId);
 
-    std::string column;
-    int numColumns = 0;
-    while(column != "HEADERSTOP") {
-        column = result.front();
-        std::pair<std::string, std::string> pair = {column, ""};
-        filestructure.m_colData.emplace_back(pair);
-        pop_front(result);
-        numColumns++;
+    std::vector<std::string> resultTitle = parse("title.akas.tsv", "The Proposal", filestructure.akas.title);
+
+    std::string testId = resultIdn.at(2);
+    std::vector<std::string> resultGenre = parse("title.basics.tsv", "The Proposal", 100);
+    for (const auto &s : resultGenre) {
+        std::cout << s << std::endl;
     }
 
-    filestructure.m_colData.erase(filestructure.m_colData.end());
-    result.erase(result.end());
-
-    std::vector<std::pair<std::string,std::string>> temp (filestructure.m_colData);
-    auto it = result.begin();
-
-    while(it != result.end())
-    {
-        filestructure.m_colData.resize(0);
-        std::vector<std::pair<std::string, std::string>>::iterator fileIt = filestructure.m_colData.begin();
-
-        for(auto tempIt = temp.begin(); tempIt != temp.end(); it++, tempIt++, fileIt++) {
-            fileIt->first = tempIt->first;
-            fileIt->second = it != result.end() ? *it : "\N";
-            filestructure.m_colData.emplace_back(fileIt->first, fileIt->second);
-        }
-
-        filestructure.m_listResult.emplace_back(filestructure.m_colData);
-    }
-
-    for(auto &element : filestructure.m_listResult) {
-        auto found = std::find_if(element.begin(), element.end(), [&] (const std::pair<std::string, std::string>& p) { return p.first == "titleId"; });
-
-        std::cout << found->first << ": " << found->second << std::endl;
-    }
     //    std::any value = "wow";
 //    value = 10.0;
 //    return std::any_cast<double>(value);

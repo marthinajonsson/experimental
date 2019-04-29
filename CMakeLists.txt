@@ -6,6 +6,6 @@ SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread")
 
 find_package(OpenSSL)
 
-add_executable(experimental main.cpp FileStructure.h)
+add_executable(experimental main.cpp FileStructure.h TitleAkas.h)
 
 target_link_libraries(experimental curl)
