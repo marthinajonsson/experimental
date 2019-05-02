@@ -87,6 +87,9 @@ void getUnpackData(std::string& file) {
     curl_global_cleanup();
 }
 
+
+
+
 #include "FileStructure.h"
 std::vector<std::string> parse(std::string &&decompressedFilename, std::string &&findStr, const short &column)
 {
