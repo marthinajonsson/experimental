@@ -1,202 +1,108 @@
-#include <any>
-#include <future>
-#include <variant>
-#include <iostream>
-#include <curl/curl.h>
-#include <optional>
-#include <stdio.h>
-#include <fstream>
-#include <vector>
-#include <sstream>
 
-#include <assert.h>
-template<typename T>
-void pop_front(std::vector<T>& vec)
+
+#include <boost/property_tree/json_parser.hpp>
+#include <string>
+#include <forward_list>
+
+const std::string TITLE = "title";
+const std::string TITLE_ID = "titleId";
+const std::string TITLE_TYPE = "titleType";
+const std::string GENRE = "genre";
+const std::string START_YEAR = "startYear";
+const std::string END_YEAR = "endYear";
+const std::string DIRECTORS = "directors";
+const std::string WRITERS = "writes";
+const std::string ACTORS = "actors";
+const std::string RUNTIME_MINUTES = "runtimeMinutes";
+const std::string PARENT_CONST = "parentTconst";
+const std::string REGION = "region";
+const std::string LANGUAGE = "language";
+const std::string EPISODE = "episode";
+const std::string SEASON = "season";
+const std::string PATH  = "path";
+const std::string LIBRARY_ID = "library_id";
+const std::string FILENAME = "name";
+
+struct Database {
+    std::string m_title = "UNDEF";
+    std::string m_titleId = "UNDEF";
+    std::string m_titleType = "UNDEF";
+    std::string m_genre = "UNDEF";
+    std::string m_startYear = "UNDEF";
+    std::string m_endYear = "UNDEF";
+    std::string m_directors = "UNDEF";
+    std::string m_writers = "UNDEF";
+    std::string m_actors = "UNDEF";
+    std::string m_runtimeMinutes;
+    std::string m_region = "UNDEF";
+    std::string m_language = "UNDEF";
+    std::string m_parentTconst = "UNDEF";
+    std::string m_episode = "UNDEF";
+    std::string m_season = "UNDEF";
+    std::string m_path = "UNDEF";
+    std::string m_library_id = "UNDEF";
+    std::string m_filename = "UNDEF";
+};
+
+template <typename S> std::string* get_begin(S *s)
 {
-    assert(!vec.empty());
-    vec.erase(vec.begin());
+    return (std::string*)s;
 }
 
-std::optional<bool> checkTrue(bool returnVal) {
-
-    std::variant<int, float, std::string> var;
-    var = 10;
-    var = "hej";
-    std::string a = std::get<std::string>(var);
-    if(returnVal) {
-        return true;
-    }
-}
-
-static size_t write_data(void *ptr, size_t size, size_t nmemb, void *stream)
+template <typename S> std::string* get_end(S *s)
 {
-    size_t written = fwrite(ptr, size, nmemb, (FILE *)stream);
-    return written;
-}
-
-#include <algorithm>
-void getUnpackData(std::string& file) {
-
-    CURL *curl = NULL;
-    FILE *fp;
-
-    curl_global_init(CURL_GLOBAL_ALL);
-    curl = curl_easy_init();
-    CURLcode res;
-    int retCode;
-
-    if (curl) {
-        std::string url = "https://datasets.imdbws.com/" + file;
-        curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
-        fp = fopen(file.c_str(), "wb");
-
-        curl_easy_setopt(curl, CURLOPT_NOPROGRESS , 0L);
-        curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, false);
-        curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, false);
-
-        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_data);
-
-        curl_easy_setopt(curl, CURLOPT_WRITEDATA, fp);
-
-        res = curl_easy_perform(curl);
-
-        if (res != CURLE_OK) {
-            std::cerr << "oops";
-        }
-
-        int i = fclose(fp);
-        if (i == 0) {
-            std::string chmodCmd = "chmod +rx " + file;
-            system(chmodCmd.c_str());
-            std::string unpackCmd = "gzip -d " + file;
-            system(unpackCmd.c_str());
-        }
-        else {
-            std::cerr << "unable to unpack" << std::endl;
-        }
-
-        long http_code = 0;
-        curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
-        retCode = static_cast<int>(http_code);
-        if(retCode != 200) {
-            std::cerr << "HTTP code " << retCode << std::endl;
-        }
-        curl_easy_cleanup(curl);
-
-    }
-    curl_global_cleanup();
+    return (std::string*)((std::string*)s+sizeof(*s));
 }
 
 
-
-
-#include "FileStructure.h"
-std::vector<std::string> parse(std::string &&decompressedFilename, std::string &&findStr, const short &column)
+template <class Object, typename T>
+void write (Object obj, T keys) noexcept 
 {
-    std::fstream file;
-    std::string compressedFilename = decompressedFilename + ".gz";
-    file.open(decompressedFilename, std::ios::in);
+    boost::property_tree::ptree root;
+    boost::property_tree::ptree parent;
+    boost::property_tree::ptree child;
 
-    if(!file.is_open()) {
-        getUnpackData(compressedFilename);
-        file.open(decompressedFilename, std::ios::in);
-    }
-    std::vector<std::string> row;
+    boost::property_tree::read_json("../data/cache.json", root);
+    long size = root.size();
+    auto index = std::to_string(size);
 
-    std::string line, word, temp;
+    auto key = keys.begin();
+    std::string* p = get_begin(&obj);
+    parent.put(*key, *p);
+    key++;
+    p++;
 
-    std::string header;
-    getline(file, header);
+    for (;p < get_end(&obj) && key != keys.end();p++, key++) {
+        if ( p == get_begin(&obj)) {
 
-    if(column < 99) {
-        //std::string firstWord = header.substr(0, line.find('\t'));
-        std::stringstream s(header);
-        for(int i = 0; i <= column; i++) {
-            getline(s, word, '\t');
         }
-        row.emplace_back(word);
-    }else {
-        std::stringstream s(header);
-        while (getline(s, word, '\t')) {
-            row.emplace_back(word);
-        }
-
+        child.put(*key, *p);
     }
 
-    while (!file.eof()) {
+    parent.put_child("additional", child);
 
-        getline(file, line);
-
-        if( std::search(line.begin(), line.end(),
-                        findStr.begin(), findStr.end()) == line.end()){
-            continue;
-        }
-
-        std::stringstream s(line);
-
-        if(column < 99) {
-//            std::string firstWord = line.substr(0, line.find('\t'));
-//            row.emplace_back(firstWord);
-            for(int i = 0; i <= column; i++) {
-                getline(s, word, '\t');
-            }
-            if(column == 2 && word.compare(findStr) != 0) { //title
-                continue;
-            }
-            row.emplace_back(word);
-        }else {
-            while (getline(s, word, '\t')) {
-                row.emplace_back(word);
-            }
-        }
-
-    }
-    file.close();
-
-    return row;
+    root.push_back(std::make_pair(index, parent));
+    boost::property_tree::json_parser::write_json("../data/cache.json", root);
 }
 
-/*
- * TODO: parse lines matching title
- * TODO: add separate method that takes does line and split columns based on param such (titleId) to cut down on the work for each operation.
- *
- * */
-
-double Task ()
-{
-    FileStructure filestructure;
-    std::cout << "Async thread running" << std::endl;
-    std::vector<std::string> resultIdn = parse("title.akas.tsv", "The Proposal", filestructure.akas.titleId);
-
-    std::vector<std::string> resultTitle = parse("title.akas.tsv", "The Proposal", filestructure.akas.title);
-
-    std::string testId = resultIdn.at(2);
-    std::vector<std::string> resultGenre = parse("title.basics.tsv", "The Proposal", 100);
-    for (const auto &s : resultGenre) {
-        std::cout << s << std::endl;
-    }
-
-    //    std::any value = "wow";
-//    value = 10.0;
-//    return std::any_cast<double>(value);
-}
 
 int main() {
-    std::cout << "Hello, World!" << std::endl;
 
-    std::string asyncWork = "Testing async";
+    std::forward_list<std::string> keys { TITLE, TITLE_ID, TITLE_TYPE, GENRE, START_YEAR, END_YEAR, DIRECTORS,
+                                                 WRITERS, ACTORS, RUNTIME_MINUTES, REGION, LANGUAGE, PARENT_CONST,
+                                                 EPISODE, SEASON, PATH, LIBRARY_ID, FILENAME };
 
-    std::future<double> fut = std::async(std::launch::async, Task);
-    
-//    std::optional<bool> opt = checkTrue(false);
-//    if (opt.has_value())
-//    {
-//        std::cout << "opt delivered: " << opt.value() << std::endl;
-//    }
+    Database obj;
+    obj.m_title = "test";
+    obj.m_titleId = "tt111111";
+    obj.m_titleType = "movie";
+    obj.m_genre = "drama";
+    obj.m_runtimeMinutes = "103";
+    obj.m_startYear = "1992";
+    obj.m_directors = "name";
+    obj.m_path = "/video1/film/title.mp4";
 
-    double result = fut.get();
-//    std::cout << "Thread result " << result << std::endl;
-
+    write<Database, std::forward_list<std::string>> (obj, keys);
     return 0;
 }
 
